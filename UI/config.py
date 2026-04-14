@@ -10,6 +10,9 @@ SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 FEATURED_DATA = os.path.join(DATA_DIR, "nav_with_features.csv")
 CLEANED_DATA = os.path.join(DATA_DIR, "cleaned_nav_data.csv")
 
+# API Configuration
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
 # Streamlit Configuration
 STREAMLIT_CONFIG = {
     "layout": "wide",

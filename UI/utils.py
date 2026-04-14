@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 import streamlit as st
-from config import FEATURED_DATA, CLEANED_DATA, RISK_LEVELS, SHARPE_LEVELS
+import requests
+from config import FEATURED_DATA, CLEANED_DATA, RISK_LEVELS, SHARPE_LEVELS, API_BASE_URL
 
 
 @st.cache_resource
@@ -208,3 +209,29 @@ def render_metric_card(title, value, subtitle="", col=None):
         st.metric(title, value, subtitle)
     else:
         col.metric(title, value, subtitle)
+
+
+def fetch_api_json(endpoint: str, params: dict | None = None, timeout: int = 10):
+    """Fetch JSON from API with basic error handling."""
+    url = f"{API_BASE_URL}{endpoint}"
+    try:
+        response = requests.get(url, params=params, timeout=timeout)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        st.error(f"API request failed: {exc}")
+        return None
+
+
+def get_api_status(timeout: int = 5) -> tuple[bool, str]:
+    """Check API health endpoint and return status message."""
+    url = f"{API_BASE_URL}/health"
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("data_loaded") is True:
+            return True, "API online"
+        return True, "API online (data not loaded)"
+    except requests.RequestException:
+        return False, "API offline"

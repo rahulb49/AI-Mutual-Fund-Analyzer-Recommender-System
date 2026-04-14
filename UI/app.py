@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from utils import (
     load_featured_data, load_cleaned_data, get_market_stats,
     categorize_risk, categorize_sharpe, format_currency, format_percent,
-    setup_page_style, get_fund_house_stats
+    setup_page_style, get_fund_house_stats, get_api_status
 )
 
 # Page configuration
@@ -42,6 +42,13 @@ st.sidebar.info(
     - Trend analysis
     """
 )
+
+# API status badge
+api_ok, api_message = get_api_status()
+if api_ok:
+    st.sidebar.success(f"✅ {api_message}")
+else:
+    st.sidebar.error(f"❌ {api_message}")
 
 # Load data
 @st.cache_resource

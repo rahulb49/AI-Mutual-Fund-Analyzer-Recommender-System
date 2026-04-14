@@ -24,6 +24,8 @@ from models.schemas import (
 from processing.feature_engineering import (
     engineer_features, generate_feature_summary, FeatureConfig
 )
+from machine_learning import cluster_funds, rank_funds, recommend_funds
+from machine_learning.config import ClusteringConfig, RankingWeights, RecommendationConfig
 
 # ===== App Configuration =====
 app = FastAPI(
@@ -580,6 +582,73 @@ async def get_top_schemes(
         'metric': metric,
         'limit': limit,
         'results': results
+    }
+
+
+# ===== ML Endpoints =====
+@app.get("/api/ml/clusters", tags=["ML"])
+async def get_fund_clusters(
+    n_clusters: int = Query(4, ge=2, le=10, description="Number of clusters"),
+    random_state: int = Query(42, description="Random seed")
+):
+    """Cluster schemes by risk/return characteristics"""
+    if not cache.loaded:
+        raise HTTPException(status_code=503, detail="Data not loaded")
+
+    scheme_df, summary = cluster_funds(
+        cache.df_features,
+        n_clusters=n_clusters,
+        random_state=random_state
+    )
+
+    return {
+        "n_clusters": n_clusters,
+        "clusters": summary["clusters"],
+        "sample": scheme_df.head(50).to_dict(orient="records")
+    }
+
+
+@app.get("/api/ml/rankings", tags=["ML"])
+async def get_ml_rankings(
+    limit: int = Query(10, ge=1, le=100),
+    risk_level: Optional[str] = Query(None, description="LOW, MODERATE, HIGH")
+):
+    """Rank schemes using multi-factor weighted scoring"""
+    if not cache.loaded:
+        raise HTTPException(status_code=503, detail="Data not loaded")
+
+    ranked = rank_funds(cache.df_features, weights=RankingWeights())
+
+    if risk_level:
+        risk_upper = risk_level.upper()
+        ranked = ranked[ranked["risk_level"] == risk_upper]
+
+    return {
+        "limit": limit,
+        "results": ranked.head(limit).to_dict(orient="records")
+    }
+
+
+@app.get("/api/ml/recommendations", tags=["ML"])
+async def get_ml_recommendations(
+    risk_profile: str = Query("moderate", description="low, moderate, high"),
+    limit: int = Query(5, ge=1, le=20)
+):
+    """Recommend schemes based on risk profile"""
+    if not cache.loaded:
+        raise HTTPException(status_code=503, detail="Data not loaded")
+
+    recommendations = recommend_funds(
+        cache.df_features,
+        risk_profile=risk_profile,
+        top_n=limit,
+        config=RecommendationConfig()
+    )
+
+    return {
+        "risk_profile": risk_profile,
+        "limit": limit,
+        "results": recommendations.to_dict(orient="records")
     }
 
 
