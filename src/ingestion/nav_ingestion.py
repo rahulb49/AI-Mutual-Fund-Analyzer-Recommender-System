@@ -12,7 +12,7 @@ from models.schemas import NAVRecord, ParsedNAVData
 
 # AMFI NAV data source & local file path to save the downloaded data
 AMFI_NAV_URL = "https://www.amfiindia.com/spages/NAVAll.txt"
-Local_file_path = r"C:\Users\Asus TUF F15\Desktop\MSC DS\input"
+Local_file_path = "/opt/airflow/data"  # Docker container path
 
 def download_nav_data(url, file_path, timeout=100):
     """Download a file from a URL and save it to your computer."""

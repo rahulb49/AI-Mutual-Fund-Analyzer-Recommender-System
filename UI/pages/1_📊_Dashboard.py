@@ -72,8 +72,8 @@ st.subheader("⚠️ Risk & Performance Metrics")
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Avg Volatility", f"{stats['avg_volatility']:.2f}%")
-col2.metric("Avg Return", f"{stats['avg_return']:.2f}%")
-col3.metric("Avg Sharpe Ratio", f"{stats['avg_sharpe']:.2f}")
+col2.metric("Avg Sharpe Ratio", f"{stats['avg_sharpe']:.2f}")
+col3.metric("Total Schemes", f"{stats['total_schemes']:,}")
 col4.metric("Risk Profile", "🟠 Moderate")
 
 # Performance Distribution

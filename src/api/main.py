@@ -2,16 +2,17 @@
 FastAPI Application for NAV Data Analysis
 Provides endpoints for querying, analyzing, and comparing mutual fund schemes
 """
+import pandas as pd
+import numpy as np
+import sys
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import pandas as pd
-import numpy as np
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
-import sys
+
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
