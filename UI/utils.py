@@ -2,12 +2,133 @@
 Utility functions for Streamlit Dashboard
 """
 
+from pathlib import Path
+import sys
+
 import pandas as pd
 import numpy as np
 from PIL import Image
 import streamlit as st
 import requests
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from config import FEATURED_DATA, CLEANED_DATA, RISK_LEVELS, SHARPE_LEVELS, API_BASE_URL
+from src.processing.feature_engineering import engineer_features, FeatureConfig
+
+AMFI_NAV_URL = "https://www.amfiindia.com/spages/NAVAll.txt"
+
+
+def _parse_amfi_nav_text(raw_text: str) -> pd.DataFrame:
+    """Parse AMFI NAV text into a cleaned DataFrame without external schema deps."""
+    records = []
+    current_fund = None
+
+    for line_number, raw_line in enumerate(raw_text.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line_number == 1:
+            continue
+
+        # Section headers and fund-house labels are plain text lines.
+        if ';' not in line:
+            if 'Mutual Fund' in line or 'Scheme' not in line:
+                current_fund = line
+            continue
+
+        fields = line.split(';')
+        if len(fields) < 6:
+            continue
+
+        scheme_code = fields[0].strip()
+        try:
+            int(scheme_code)
+        except ValueError:
+            continue
+
+        nav_value = pd.to_numeric(fields[4].strip(), errors='coerce')
+        nav_date = pd.to_datetime(fields[5].strip(), errors='coerce', dayfirst=True)
+
+        if pd.isna(nav_value) or pd.isna(nav_date):
+            continue
+
+        records.append({
+            'scheme_code': int(scheme_code),
+            'isin_div_payout': None if fields[1].strip() in {'', '-'} else fields[1].strip(),
+            'isin_growth': None if fields[2].strip() in {'', '-'} else fields[2].strip(),
+            'scheme_name': fields[3].strip(),
+            'net_asset_value': float(nav_value),
+            'date': nav_date,
+            'fund_house': current_fund or 'Unknown',
+        })
+
+    df = pd.DataFrame(records)
+    if not df.empty:
+        df = df.sort_values(['scheme_code', 'date']).reset_index(drop=True)
+    return df
+
+
+def _fetch_remote_cleaned_data() -> pd.DataFrame | None:
+    """Download and parse the AMFI NAV text when local CSVs are not present."""
+    try:
+        response = requests.get(AMFI_NAV_URL, timeout=60)
+        response.raise_for_status()
+        df = _parse_amfi_nav_text(response.text)
+        if df.empty:
+            return None
+        return df
+    except requests.RequestException as exc:
+        st.error(f"Failed to download live NAV data from AMFI: {exc}")
+        return None
+
+
+def _ensure_feature_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Guarantee the columns expected by the dashboard even on partial datasets."""
+    required_columns = [
+        'cum_return', 'volatility_30d', 'sharpe_ratio_30d', 'sortino_ratio_30d',
+        'max_drawdown_1y', 'trend_slope', 'trend_strength', 'rsi_14',
+        'golden_cross', 'price_above_ema', 'rsi_overbought', 'rsi_oversold',
+        'SMA_20', 'SMA_50', 'EMA_12', 'daily_return', 'daily_return_decimal'
+    ]
+    for column in required_columns:
+        if column not in df.columns:
+            df[column] = np.nan
+    return df
+
+
+def _build_featured_dataset_from_cleaned(cleaned_df: pd.DataFrame) -> pd.DataFrame:
+    """Engineer features scheme-by-scheme for the dashboard."""
+    if cleaned_df is None or cleaned_df.empty:
+        return pd.DataFrame()
+
+    featured_groups = []
+    feature_config = FeatureConfig()
+
+    for _, group in cleaned_df.groupby('scheme_code', sort=False):
+        try:
+            featured_groups.append(engineer_features(group.copy(), feature_config))
+        except Exception:
+            fallback_group = group.copy().sort_values('date').reset_index(drop=True)
+            fallback_group = _ensure_feature_columns(fallback_group)
+            fallback_group['cum_return'] = ((fallback_group['net_asset_value'] - fallback_group['net_asset_value'].iloc[0])
+                                            / fallback_group['net_asset_value'].iloc[0]) * 100
+            fallback_group['daily_return'] = fallback_group['net_asset_value'].pct_change() * 100
+            fallback_group['daily_return_decimal'] = fallback_group['daily_return'] / 100
+            fallback_group['volatility_30d'] = fallback_group['daily_return'].rolling(window=30, min_periods=1).std() * np.sqrt(252)
+            fallback_group['sharpe_ratio_30d'] = 0.0
+            fallback_group['sortino_ratio_30d'] = 0.0
+            fallback_group['max_drawdown_1y'] = 0.0
+            fallback_group['trend_slope'] = 0.0
+            fallback_group['trend_strength'] = 0.0
+            fallback_group['rsi_14'] = 50.0
+            fallback_group['golden_cross'] = 0
+            fallback_group['price_above_ema'] = 0
+            fallback_group['rsi_overbought'] = 0
+            fallback_group['rsi_oversold'] = 0
+            featured_groups.append(fallback_group)
+
+    featured_df = pd.concat(featured_groups, ignore_index=True)
+    featured_df = _ensure_feature_columns(featured_df)
+    featured_df['date'] = pd.to_datetime(featured_df['date'])
+    return featured_df
 
 
 def render_info_button(text: str, key: str, container=None):
@@ -61,26 +182,17 @@ def render_info_button(text: str, key: str, container=None):
 def load_featured_data():
     """Load featured data with caching"""
     try:
-        df = pd.read_csv(FEATURED_DATA)
-        df['date'] = pd.to_datetime(df['date'])
-        return df
-    except FileNotFoundError:
-        # Fallback: try to construct a minimal featured dataframe from cleaned data
-        try:
-            st.warning(f"Featured data not found at {FEATURED_DATA}. Building minimal featured dataset from cleaned data...")
-            cleaned = pd.read_csv(CLEANED_DATA)
-            cleaned['date'] = pd.to_datetime(cleaned['date'])
-            # Keep minimal columns expected by the UI and add placeholder feature columns
-            df = cleaned.copy()
-            for col in ['cum_return', 'volatility_30d', 'sharpe_ratio_30d', 'sortino_ratio_30d',
-                        'max_drawdown_1y', 'trend_slope', 'trend_strength', 'rsi_14',
-                        'golden_cross', 'price_above_ema', 'rsi_overbought', 'rsi_oversold']:
-                if col not in df.columns:
-                    df[col] = np.nan
+        if Path(FEATURED_DATA).exists():
+            df = pd.read_csv(FEATURED_DATA)
+            df['date'] = pd.to_datetime(df['date'])
             return df
-        except Exception as e:
-            st.error(f"Error building fallback featured data: {e}")
+
+        st.info("Featured data file is not bundled. Loading live AMFI data and rebuilding features...")
+        cleaned = load_cleaned_data()
+        if cleaned is None or cleaned.empty:
             return None
+
+        return _build_featured_dataset_from_cleaned(cleaned)
     except Exception as e:
         st.error(f"Error loading featured data: {e}")
         return None
@@ -90,9 +202,16 @@ def load_featured_data():
 def load_cleaned_data():
     """Load cleaned data with caching"""
     try:
-        df = pd.read_csv(CLEANED_DATA)
-        df['date'] = pd.to_datetime(df['date'])
-        return df
+        if Path(CLEANED_DATA).exists():
+            df = pd.read_csv(CLEANED_DATA)
+            df['date'] = pd.to_datetime(df['date'])
+            return df
+
+        st.info("Cleaned data file is not bundled. Downloading live AMFI NAV text...")
+        df = _fetch_remote_cleaned_data()
+        if df is not None and not df.empty:
+            return df
+        return None
     except Exception as e:
         st.error(f"Error loading cleaned data: {e}")
         return None
