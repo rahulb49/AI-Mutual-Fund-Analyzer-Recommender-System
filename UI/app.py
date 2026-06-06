@@ -55,11 +55,17 @@ else:
 def init_data():
     featured = load_featured_data()
     cleaned = load_cleaned_data()
+
+    if featured is None and cleaned is not None:
+        featured = cleaned.copy()
+    elif cleaned is None and featured is not None:
+        cleaned = featured.copy()
+
     return featured, cleaned
 
 featured_df, cleaned_df = init_data()
 
-if featured_df is None or cleaned_df is None:
+if featured_df is None and cleaned_df is None:
     st.error("❌ Failed to load data. Please ensure data files exist.")
     st.stop()
 

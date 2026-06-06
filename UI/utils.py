@@ -188,7 +188,14 @@ def load_featured_data():
             return df
 
         st.info("Featured data file is not bundled. Loading live AMFI data and rebuilding features...")
-        cleaned = load_cleaned_data()
+        cleaned = None
+        if Path(CLEANED_DATA).exists():
+            cleaned = pd.read_csv(CLEANED_DATA)
+            cleaned['date'] = pd.to_datetime(cleaned['date'])
+
+        if cleaned is None or cleaned.empty:
+            cleaned = _fetch_remote_cleaned_data()
+
         if cleaned is None or cleaned.empty:
             return None
 
