@@ -1,0 +1,15 @@
+flowchart LR
+    A[AMFI NAV (NAVAll.txt)] --> B[Ingestion]
+    B --> C[Data Cleaning]
+    C --> D[Feature Engineering]
+    D --> E[Data Store / CSVs]
+    E --> F[FastAPI Backend]
+    F --> G[Streamlit Dashboard]
+    D --> H[ML: Clustering / Ranking / Recommendation]
+    H --> G
+    subgraph Airflow
+      B
+      C
+      D
+      H
+    end
