@@ -276,7 +276,7 @@ else:
                 'Average Daily Return'
             ],
             'Value': [
-                len(scheme_full_data),
+                f"{len(scheme_full_data)}",
                 f"{scheme_full_data['date'].min().date()} to {scheme_full_data['date'].max().date()}",
                 format_currency(scheme_full_data['net_asset_value'].mean()),
                 format_currency(scheme_full_data['net_asset_value'].std()),

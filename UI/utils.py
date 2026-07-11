@@ -405,7 +405,6 @@ def fetch_api_json(endpoint: str, params: dict | None = None, timeout: int = 10)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as exc:
-        st.error(f"API request failed: {exc}")
         return None
 
 
