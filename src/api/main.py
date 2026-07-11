@@ -5,6 +5,7 @@ Provides endpoints for querying, analyzing, and comparing mutual fund schemes
 import pandas as pd
 import numpy as np
 import sys
+from math import isfinite
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,7 +49,7 @@ app.add_middleware(
 
 # ===== Global State =====
 class DataCache:
-    """In-memory data cache"""
+    """In-memory cache used by the API to avoid repeated CSV reads."""
     def __init__(self):
         self.df = None
         self.df_features = None
@@ -57,6 +58,41 @@ class DataCache:
         self.config = FeatureConfig()
 
 cache = DataCache()
+
+
+def _json_safe_value(value):
+    """Convert pandas and NumPy values into JSON-safe primitives."""
+    if value is None:
+        return None
+
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return value.isoformat()
+
+    if isinstance(value, np.generic):
+        value = value.item()
+
+    if isinstance(value, float):
+        return value if isfinite(value) else None
+
+    if isinstance(value, dict):
+        return {key: _json_safe_value(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(item) for item in value]
+
+    if pd.isna(value):
+        return None
+
+    return value
+
+
+def _serialize_dataframe(df: pd.DataFrame) -> list[dict]:
+    """Serialize a DataFrame into JSON-safe records for API responses."""
+    clean_df = df.replace([np.inf, -np.inf], np.nan)
+    return [
+        {column: _json_safe_value(value) for column, value in record.items()}
+        for record in clean_df.to_dict(orient="records")
+    ]
 
 
 def load_data():
@@ -73,6 +109,7 @@ def load_data():
             cache.loaded = False
             return False
         
+        # Prefer precomputed featured data; fall back to cleaned data if required.
         cache.df = pd.read_csv(data_file)
         cache.df['date'] = pd.to_datetime(cache.df['date'])
         
@@ -93,6 +130,7 @@ def load_data():
             cache.df_features = cache.df.copy()
         
         # Build schemes dictionary for fast lookup
+        # Lightweight lookup map for scheme metadata used by endpoint helpers.
         cache.schemes_dict = cache.df.groupby('scheme_code').apply(
             lambda x: {
                 'scheme_name': x['scheme_name'].iloc[0],
@@ -127,6 +165,42 @@ async def health_check():
         timestamp=datetime.now(),
         data_loaded=cache.loaded
     )
+
+
+@app.get("/api/data/featured", tags=["Data"])
+async def get_featured_data(limit: Optional[int] = Query(None, ge=1, le=50000)):
+    """Return the featured dataset for the Streamlit dashboard."""
+    if not cache.loaded or cache.df_features is None:
+        raise HTTPException(status_code=503, detail="Data not loaded")
+
+    # Streamlit consumes a JSON payload, so the endpoint serializes the table directly.
+    df = cache.df_features.copy()
+    if limit is not None:
+        df = df.head(limit)
+
+    return {
+        "count": int(len(df)),
+        "columns": list(df.columns),
+        "records": _serialize_dataframe(df),
+    }
+
+
+@app.get("/api/data/cleaned", tags=["Data"])
+async def get_cleaned_data(limit: Optional[int] = Query(None, ge=1, le=50000)):
+    """Return the cleaned dataset for the Streamlit dashboard."""
+    if not cache.loaded or cache.df is None:
+        raise HTTPException(status_code=503, detail="Data not loaded")
+
+    # Keep the payload bounded for browser rendering and faster local development.
+    df = cache.df.copy()
+    if limit is not None:
+        df = df.head(limit)
+
+    return {
+        "count": int(len(df)),
+        "columns": list(df.columns),
+        "records": _serialize_dataframe(df),
+    }
 
 
 # ===== Helper Functions =====

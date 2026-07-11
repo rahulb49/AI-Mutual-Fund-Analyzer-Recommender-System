@@ -57,6 +57,9 @@ else:
         scheme_code = featured_df[featured_df['scheme_name'] == scheme]['scheme_code'].iloc[0]
         scheme_latest = featured_df[featured_df['scheme_code'] == scheme_code].sort_values('date').iloc[-1]
         scheme_history = featured_df[featured_df['scheme_code'] == scheme_code].sort_values('date')
+        sharpe_ratio = scheme_latest.get('sharpe_ratio_30d', 0)
+        if pd.isna(sharpe_ratio):
+            sharpe_ratio = 0
         
         scheme_histories[scheme] = scheme_history
         
@@ -68,7 +71,8 @@ else:
             'Return %': float(scheme_latest.get('cum_return', 0)),
             'Daily Return %': float(scheme_latest.get('daily_return', 0)),
             'Volatility %': float(scheme_latest.get('volatility_30d', 0)),
-            'Sharpe Ratio': float(scheme_latest.get('sharpe_ratio_30d', 0)),
+            'Sharpe Ratio': float(sharpe_ratio),
+            'Sharpe Bubble Size': max(abs(float(sharpe_ratio)), 0.5),
             'Sortino Ratio': float(scheme_latest.get('sortino_ratio_30d', 0)),
             'Max Drawdown %': float(scheme_latest.get('max_drawdown_1y', 0)),
             'Data Points': len(scheme_history)
@@ -102,7 +106,7 @@ else:
             comp_df,
             x='Volatility %',
             y='Return %',
-            size='Sharpe Ratio',
+            size='Sharpe Bubble Size',
             hover_name='Scheme',
             hover_data=['Fund House', 'Sharpe Ratio'],
             title="Return vs Risk (Size = Sharpe Ratio)",

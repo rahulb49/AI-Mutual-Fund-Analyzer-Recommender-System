@@ -18,9 +18,11 @@ def cluster_funds(
     scheme_df = build_scheme_feature_frame(df_features)
     matrix = get_feature_matrix(scheme_df)
 
+    # Scale features so high-magnitude metrics do not dominate KMeans distance.
     scaler = StandardScaler()
     scaled = scaler.fit_transform(matrix)
 
+    # K is configurable; the default in this project is 4 clusters.
     model = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10)
     scheme_df["cluster_id"] = model.fit_predict(scaled)
 

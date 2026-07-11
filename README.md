@@ -52,7 +52,7 @@ The NAV Analysis Platform is a comprehensive data science solution for mutual fu
 
 ```bash
 # Navigate to project
-cd "c:\Users\Asus TUF F15\Downloads\Project\MSC DS"
+cd "c:\Users\Asus TUF F15\Downloads\Project\AI-Mutual-Fund-Analyzer-Recommender-System"
 
 # Activate virtual environment
 .venv\Scripts\activate
@@ -110,6 +110,7 @@ python test_api_direct.py
 - ✅ Interactive visualizations with Plotly
 - ✅ Real-time API integration
 - ✅ Export capabilities
+- ✅ ML pages for clustering, rankings, and recommendations
 
 ### 📈 Financial Metrics (17 Total)
 | Category | Metrics |
@@ -126,7 +127,7 @@ python test_api_direct.py
 ## 📁 Project Structure
 
 ```
-MSC DS/
+AI-Mutual-Fund-Analyzer-Recommender-System/
 ├── src/                                    # Main source code
 │   ├── api/
 │   │   └── main.py                        # FastAPI application (15+ endpoints)
@@ -247,13 +248,13 @@ Raw NAV Data (AMFI)
 - **Output:** 1,874 featured schemes with full metrics
 
 ### Phase 4: API Layer
-- Exposes cleaned data via REST endpoints
+- Exposes cleaned and featured data via REST endpoints
 - Implements caching for performance
 - Provides search, comparison, ranking capabilities
 - **Output:** Fast, queryable interface (< 100ms per request)
 
 ### Phase 5: Dashboard UI
-- Steamlit web interface
+- Streamlit web interface
 - Real-time API integration
 - Interactive visualizations
 - Scheme comparison tools
@@ -364,7 +365,7 @@ python run_dashboard.py
 
 ### Step 1: Clone/Download Project
 ```bash
-cd "c:\Users\Asus TUF F15\Downloads\Project\MSC DS"
+cd "c:\Users\Asus TUF F15\Downloads\Project\AI-Mutual-Fund-Analyzer-Recommender-System"
 ```
 
 ### Step 2: Create Virtual Environment

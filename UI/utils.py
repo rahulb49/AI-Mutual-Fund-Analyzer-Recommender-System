@@ -7,7 +7,6 @@ import sys
 
 import pandas as pd
 import numpy as np
-from PIL import Image
 import streamlit as st
 import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -139,49 +138,21 @@ def render_info_button(text: str, key: str, container=None):
     - `container`: optional Streamlit container (column) to render button into
     - `target`: optional Streamlit delta container (where the info text should appear)
     """
-    # Backwards-compatible: accept 'container' as positional but allow target via kw
-    # If caller passes a tuple (btn_container, target), unpack it.
-    target = None
-    if isinstance(container, tuple) and len(container) == 2:
-        container, target = container
-
-    if key not in st.session_state:
-        st.session_state[key] = False
-
-    def _render(btn_container, text_target):
-        clicked = btn_container.button("ℹ️", key=key + "_btn", help="More info", use_container_width=False)
-        if clicked:
-            st.session_state[key] = not st.session_state[key]
-
-        if st.session_state.get(key):
-            html = (
-                f"<div class='info-box'><div>{text}</div></div>"
-            )
-            if text_target is not None:
-                text_target.markdown(html, unsafe_allow_html=True)
-            else:
-                st.markdown(html, unsafe_allow_html=True)
-        else:
-            if text_target is not None:
-                text_target.empty()
-
-    # default button container is st (main)
-    btn_container = st
-    if container is not None:
-        btn_container = container
-
-    # if target provided in kwargs (compatibility), use it
-    # callers may pass target via st.empty() placeholder
-    # if target variable exists in caller's scope, it should be passed as keyword arg
-    # For simplicity, we support passing 'target' via st.session_state variable name
-    # But primary usage is to pass explicit target in call (handled below by caller unpacking)
-    _render(btn_container, target)
+    # Info button disabled
+    pass
 
 
 @st.cache_resource
 def load_featured_data():
     """Load featured data with caching"""
     try:
+        api_data = fetch_api_json("/api/data/featured", timeout=30)
+        if api_data and api_data.get("records"):
+            df = pd.DataFrame(api_data["records"])
+            if "date" in df.columns:
+                df['date'] = pd.to_datetime(df['date'])
+            return df
+
         if Path(FEATURED_DATA).exists():
             df = pd.read_csv(FEATURED_DATA)
             df['date'] = pd.to_datetime(df['date'])
@@ -209,6 +180,13 @@ def load_featured_data():
 def load_cleaned_data():
     """Load cleaned data with caching"""
     try:
+        api_data = fetch_api_json("/api/data/cleaned", timeout=30)
+        if api_data and api_data.get("records"):
+            df = pd.DataFrame(api_data["records"])
+            if "date" in df.columns:
+                df['date'] = pd.to_datetime(df['date'])
+            return df
+
         if Path(CLEANED_DATA).exists():
             df = pd.read_csv(CLEANED_DATA)
             df['date'] = pd.to_datetime(df['date'])

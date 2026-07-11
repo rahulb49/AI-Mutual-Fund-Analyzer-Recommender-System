@@ -3,9 +3,11 @@ NAV Analysis Dashboard - Main Application
 Streamlit-based interactive dashboard for analyzing mutual fund data
 """
 
+import runpy
+from pathlib import Path
+
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from utils import (
@@ -21,27 +23,28 @@ setup_page_style()
 st.sidebar.title("📊 NAV Analysis Dashboard")
 st.sidebar.markdown("---")
 
+PAGE_FILES = {
+    "🤖 ML Clusters": Path(__file__).parent / "pages" / "6_🤖_ML_Clusters.py",
+    "⭐ ML Rankings": Path(__file__).parent / "pages" / "7_⭐_ML_Rankings.py",
+    "🎯 ML Recommendations": Path(__file__).parent / "pages" / "8_🎯_ML_Recommendations.py",
+}
+
 page = st.sidebar.radio(
     "Navigate to:",
-    ["🏠 Dashboard", "🔍 Scheme Analysis", "⚖️ Comparison", "🏆 Rankings", "📈 Statistics"],
+    [
+        "🏠 Dashboard",
+        "🔍 Scheme Analysis",
+        "⚖️ Comparison",
+        "🏆 Rankings",
+        "📈 Statistics",
+        "🤖 ML Clusters",
+        "⭐ ML Rankings",
+        "🎯 ML Recommendations",
+    ],
     index=0
 )
 
-st.sidebar.markdown("---")
-st.sidebar.info(
-    """
-    **About This Dashboard**
-    
-    Interactive analysis of 14,341 mutual fund schemes across 51 fund houses.
-    
-    📊 Features:
-    - Scheme search & analysis
-    - Risk metrics
-    - Performance comparison
-    - Market statistics
-    - Trend analysis
-    """
-)
+
 
 # API status badge
 api_ok, api_message = get_api_status()
@@ -55,15 +58,17 @@ else:
 def init_data():
     featured = load_featured_data()
     cleaned = load_cleaned_data()
-
     if featured is None and cleaned is not None:
         featured = cleaned.copy()
     elif cleaned is None and featured is not None:
         cleaned = featured.copy()
-
     return featured, cleaned
-
 featured_df, cleaned_df = init_data()
+
+if page in PAGE_FILES:
+    # Run standalone page modules inside the main Streamlit session.
+    runpy.run_path(str(PAGE_FILES[page]), run_name="__main__")
+    st.stop()
 
 if featured_df is None and cleaned_df is None:
     st.error("❌ Failed to load data. Please ensure data files exist.")
@@ -404,6 +409,9 @@ elif page == "⚖️ Comparison":
                 'scheme_code'
             ].iloc[0]
             scheme_latest = featured_df[featured_df['scheme_code'] == scheme_code].iloc[-1]
+            sharpe_ratio = scheme_latest.get('sharpe_ratio_30d', 0)
+            if pd.isna(sharpe_ratio):
+                sharpe_ratio = 0
             
             comparison_data.append({
                 'Scheme': scheme[:30],
@@ -411,8 +419,8 @@ elif page == "⚖️ Comparison":
                 'Current NAV': scheme_latest['net_asset_value'],
                 'Return %': scheme_latest.get('cum_return', 0),
                 'Volatility %': scheme_latest.get('volatility_30d', 0),
-                'Sharpe Ratio': scheme_latest.get('sharpe_ratio_30d', 0),
-                'Sharpe Bubble Size': max(abs(float(scheme_latest.get('sharpe_ratio_30d', 0))), 0.5),
+                'Sharpe Ratio': sharpe_ratio,
+                'Sharpe Bubble Size': max(abs(float(sharpe_ratio)), 0.5),
                 'Sortino Ratio': scheme_latest.get('sortino_ratio_30d', 0),
                 'Max Drawdown %': scheme_latest.get('max_drawdown_1y', 0),
             })
@@ -738,5 +746,5 @@ st.sidebar.markdown("---")
 st.sidebar.markdown(
     "**Dashboard Version**: 1.0.0\n\n"
     "**Last Updated**: April 9, 2026\n\n"
-    "[📖 Documentation]() | [🔗 API](http://localhost:8000/docs)"
+    "[📖 Documentation](https://github.com/rahulb49/AI-Mutual-Fund-Analyzer-Recommender-System) | [🔗 API](http://localhost:8000/docs)"
 )

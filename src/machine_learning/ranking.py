@@ -15,8 +15,10 @@ def rank_funds(
     scheme_df = build_scheme_feature_frame(df_features)
     weights = weights or RankingWeights()
 
+    # Drawdown is treated as a penalty because larger losses are less desirable.
     drawdown_penalty = scheme_df["max_drawdown"].abs()
 
+    # Composite score combines return, risk, downside protection, and trend.
     scheme_df["score"] = (
         weights.return_weight * scheme_df["total_return"]
         + weights.sharpe_weight * scheme_df["sharpe_ratio"]
